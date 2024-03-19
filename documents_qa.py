@@ -1,5 +1,6 @@
 # 在这个示例中，将了解retrieval机制到底是用来干什么的，它是如何用来联系上下文的。
 # 引入gradio为本地知识库做出一个精美的可交互web端
+import gradio
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
@@ -109,8 +110,10 @@ def predict(message, history):
 
 # 这里我理解为可以将web交互端的输入作为predict函数的message，并返回对应的回答
 demo = gr.ChatInterface(fn=predict,
-                        examples=["今天天气如何？", "区块链是什么？", "我喜欢一个女孩子，该如何追求她"],
-                        title="本地知识库问答系统")
+                       # examples=["给我推荐基本适合学习经济学的书", "区块链是什么？", "我喜欢一个女孩子，该如何追求她"],
+                        title="本地知识库问答系统",
+                        # 额外的输入，定义滑块和文件上传功能
+                        )
 if __name__ == "__main__":
     demo.launch()
 

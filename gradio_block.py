@@ -1,5 +1,6 @@
 # 在这个示例中，将了解retrieval机制到底是用来干什么的，它是如何用来联系上下文的。
 # 引入gradio为本地知识库做出一个精美的可交互web端
+import gradio
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
@@ -15,10 +16,10 @@ from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 
 
 # 文件加载，直接加载本地book文件夹下的所有文件，并使用拆分器将其拆分
-def load_documents(directory='book'):
+def load_documents(directory):
     # silent_errors可以跳过不能解码的内容
     text_loader_kwargs = {'autodetect_encoding': True}
-    loader = DirectoryLoader('book', show_progress=True, silent_errors=True, loader_kwargs=text_loader_kwargs)
+    loader = DirectoryLoader(directory, show_progress=True, silent_errors=True, loader_kwargs=text_loader_kwargs)
     documents = loader.load()
 
     # 加载文档后，要使得内容变得更加易于llm加载，就必须把长文本切割成一个个的小文本
@@ -74,7 +75,8 @@ def store_chroma(docs, embeddings, persist_directory="VectorStore"):
 # 定义一个函数用来作为gr.ChatInterface()的fn，history[
 def predict(message, history):
     # 设置提示词，其作用是输入问题给llm处理
-    template = """Answer the question based only on the following context:
+    template = """回答接下来的问题，必须以中文给出回答，并且如果不清楚如何回答
+    就回答不知道，基于给出的context:
     {context}
 
     Question: {question}
@@ -90,7 +92,7 @@ def predict(message, history):
     embedding = load_embedding_model('text2vec3')
     # 加载数据库，不存在向量库就生成，否则直接加载
     if not os.path.exists('VectorStore'):
-        documents = load_documents()
+        documents = load_documents(directory='book')
         db = store_chroma(documents, embedding)
     else:
         db = Chroma(persist_directory='VectorStore', embedding_function=embedding)
@@ -107,10 +109,79 @@ def predict(message, history):
 
 # 本地检索，加载本地文件也应该单独领出来写一个函数
 
-# 这里我理解为可以将web交互端的输入作为predict函数的message，并返回对应的回答
-demo = gr.ChatInterface(fn=predict,
-                        examples=["今天天气如何？", "区块链是什么？", "我喜欢一个女孩子，该如何追求她"],
-                        title="本地知识库问答系统")
+# UI界面
+def print_like_dislike(x: gr.LikeData):
+    print(x.index, x.value, x.liked)
+
+
+def add_text(history, text):
+    history = history + [(text, None)]
+    return history, gr.Textbox(value="", interactive=False)
+
+
+def add_file(history, file):
+    directory = os.path.dirname(file.name)  # 拿到临时文件夹
+    documents = load_documents(directory)
+    embedding = load_embedding_model()
+    store_chroma(documents, embedding)   #
+    # 将临时上传的加载好，并存到数据库里面
+    history = history + [((file.name,), None)]
+    return history
+
+
+def bot(history):
+    '''
+    history参数是一个记录对话历史的列表。
+    每个历史记录都是一个元组，其中包含用户消息和对应的机器人回复。
+    在这个列表中，最新的对话记录总是位于列表的最后一个位置，因此history[-1]表示最新的对话记录。
+    '''
+    message = history[-1][0]
+    # 检查文件是否上传成功，如果上传的是文件，则用户信息就是元组
+    if isinstance(message, tuple):
+        response = "文件上传成功！！"
+    else:
+        response = predict(message, history)
+    # 动态的展示机器人回复的样子，模拟人类打字
+    history[-1][1] = ""
+    for character in response:
+        history[-1][1] += character
+        time.sleep(0.05)
+        yield history
+
+
+with gr.Blocks() as demo:
+    # 定义聊天框
+    chatbot = gr.Chatbot(
+        [],
+        elem_id="chatbot",
+        bubble_full_width=False,
+        avatar_images=(None, (os.path.join(os.path.dirname(__file__), "avatar.png"))),
+        # layout如果为"panel"显示聊天框为llm风格，"bubbles"显示为聊天气泡
+        layout="bubble"
+    )
+    # 定义行的布局g
+    with gr.Row():
+        txt = gr.Textbox(
+            scale=4,  # 设置与相邻元件大小的比列
+            show_label=False,
+            placeholder="输入您的问题，或者上传一个文件",
+            container=False,
+        )
+        # 限定上传文件的类型只为text文件
+        btn = gr.UploadButton("📁", file_types=["text"])
+    # 设置提交用户问题按钮的监听事件
+    # 首先调用add_text()函数处理用户输入，随后传入llm模型返回回答
+    txt_msg = txt.submit(add_text, [chatbot, txt], [chatbot, txt], queue=False).then(
+        bot, chatbot, chatbot, api_name="bot_response"
+    )
+    txt_msg.then(lambda: gr.Textbox(interactive=True), None, [txt], queue=False)
+    file_msg = btn.upload(add_file, [chatbot, btn], [chatbot], queue=False).then(
+        bot, chatbot, chatbot
+    )
+
+    chatbot.like(print_like_dislike, None, None)
+
+
+demo.queue()
 if __name__ == "__main__":
     demo.launch()
-
