@@ -1,6 +1,4 @@
-# 在这个示例中，将了解retrieval机制到底是用来干什么的，它是如何用来联系上下文的。
-# 引入gradio为本地知识库做出一个精美的可交互web端
-import gradio
+# 完成基本的UI界面，调试使得LLM回答的准确度提高
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
@@ -10,7 +8,6 @@ import os
 import time
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import CharacterTextSplitter
-from openai import OpenAI
 from langchain_community.vectorstores import Chroma
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 
@@ -75,8 +72,7 @@ def store_chroma(docs, embeddings, persist_directory="VectorStore"):
 # 定义一个函数用来作为gr.ChatInterface()的fn，history[
 def predict(message, history):
     # 设置提示词，其作用是输入问题给llm处理
-    template = """回答接下来的问题，必须以中文给出回答，并且如果不清楚如何回答
-    就回答不知道，基于给出的context:
+    template = """回答接下来的问题，必须以中文给出回答,基于给出的context:
     {context}
 
     Question: {question}
@@ -96,7 +92,7 @@ def predict(message, history):
         db = store_chroma(documents, embedding)
     else:
         db = Chroma(persist_directory='VectorStore', embedding_function=embedding)
-    # 这个写法是照抄LCEL的说明，并没有完全理解
+    # 从数据库中获取一个检索器，用于从向量库中检索和给定文本相匹配的内容
     retriever = db.as_retriever()
     setup_and_retrieval = RunnableParallel(
         {"context": retriever, "question": RunnablePassthrough()}
@@ -136,12 +132,14 @@ def bot(history):
     在这个列表中，最新的对话记录总是位于列表的最后一个位置，因此history[-1]表示最新的对话记录。
     '''
     message = history[-1][0]
+    # 用来在终端监视程序有无正确提取到用户提出的问题
+    print(message)
     # 检查文件是否上传成功，如果上传的是文件，则用户信息就是元组
     if isinstance(message, tuple):
         response = "文件上传成功！！"
     else:
         response = predict(message, history)
-    # 动态的展示机器人回复的样子，模拟人类打字
+    # 将最新对话记录中的机器人回复部分置空
     history[-1][1] = ""
     for character in response:
         history[-1][1] += character
