@@ -21,7 +21,7 @@
 
 使用LangChain-smith进行调试，可以清晰的看到本地检索了哪些段落，整个chain的工作流程
 
-![image](https://github.com/BlackSiao/LangChain-OpenAI-gradio/tree/main/img/smith.png)
+![Image text](https://github.com/BlackSiao/LangChain-OpenAI-gradio/tree/main/img/smith.png)
 
 
 
