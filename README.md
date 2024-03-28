@@ -16,5 +16,11 @@
 5. final_test.py  ---最终成品，运行即可，实现完全体的本地知识库问答系统
 
 
-成品演示：
+# 成品演示：
+![image](https://github.com/BlackSiao/LangChain-OpenAI-gradio/tree/main/img/demo.png))
+使用LangChain-smith进行调试，可以清晰的看到本地检索了哪些段落，整个chain的工作流程
+![image](https://github.com/BlackSiao/LangChain-OpenAI-gradio/tree/main/img/smith.png))
+
+
+
 
