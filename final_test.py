@@ -10,13 +10,14 @@ from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-import getpass
+from langchain_core.messages import AIMessage, HumanMessage
 
 # 调用LangChain-smith
 os.environ['LANGCHAIN_API_KEY'] = 'ls__57a5dab74800476883643b1813746542'
 os.environ['LANGCHAIN_PROJECT'] = 'RAG-Application'
 os.environ['LANGCHAIN_TRACING_V2'] = 'true'
 os.environ['LANGCHAIN_ENDPOINT'] = 'https://api.smith.langchain.com'
+chat_history = []
 
 # 文件加载，直接加载本地book文件夹下的所有文件，并使用拆分器将其拆分
 def load_documents(directory):
@@ -77,19 +78,10 @@ def store_chroma(docs, embeddings, persist_directory="VectorStore"):
 
 # 定义一个函数用来作为gr.ChatInterface()的fn，history[
 def predict(message, history):
-    # 设置提示词，其作用是输入问题给llm处理
-    template = """回答接下来的问题，必须以中文给出回答,基于给出的context:
-    {context}
-
-    Question: {question}
-    """
-    prompt = ChatPromptTemplate.from_template(template)
     # 加载并初始化模型
     model = ChatOpenAI(temperature=1.0, model="gpt-3.5-turbo")
     # 将llm的输出转换为str
     output_parser = StrOutputParser()
-    # Retriever检索函数 Vector store-backed retriever
-    # docs = load_documents()
     # 加载embedding模型
     embedding = load_embedding_model('text2vec3')
     # 加载数据库，不存在向量库就生成，否则直接加载
@@ -104,13 +96,59 @@ def predict(message, history):
     setup_and_retrieval = RunnableParallel(
         {"context": retriever, "question": RunnablePassthrough()}
     )
-    # 链式写法
-    chain = setup_and_retrieval | prompt | model | output_parser
-    response = chain.invoke(message)
-    return response
 
+    # 设置子链，如果用户的最新问题和前文相关，交由子链处理，在提示词内添加上chat_histor
+    contextualize_q_system_prompt = """如果用户最新的提问内容和之前的对话内容
+        相关，则重新编排用户的最新提问，添加上之前的对话内容；
+        如果用户最新的提问内容不涉及到之前的对话内容，则直接返回该提问内容
+        不用回答此问题，你的任务要么重新编排该提问，要么原样返回"""
+    contextualize_q_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", contextualize_q_system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{question}"),
+        ]
+    )
 
-# 本地检索，加载本地文件也应该单独领出来写一个函数
+    # 设置主链的内容
+    qa_system_prompt = """你是一个专门回答问题的助手。 \
+        擅长使用以下的Context作为依据回答问题。 \
+        如果你不知道答案，回答不知道即可，不要尝试捏造答案。 \
+        尽可能详细，全面的回答问题。\
+        {context}"""
+    qa_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", qa_system_prompt),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{question}"),
+        ]
+    )
+    # LCEL写法，整合子链和主链
+    contextualize_q_chain = contextualize_q_prompt | model | StrOutputParser()
+
+    # 判断用户输入的问题有没有涉及上下文
+    def contextualized_question(input: dict):
+        if input.get("chat_history"):
+            return contextualize_q_chain
+        else:
+            return input["question"]
+
+    # 对输出的context进行整理
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
+
+    rag_chain = (
+            RunnablePassthrough.assign(
+                context=contextualized_question | retriever | format_docs
+            )
+            | qa_prompt
+            | model
+            | output_parser
+    )
+    question = message
+    ai_msg = rag_chain.invoke({"question": question, "chat_history": chat_history})
+    chat_history.extend([HumanMessage(content=question), ai_msg])
+    return ai_msg
 
 # UI界面
 def print_like_dislike(x: gr.LikeData):
@@ -119,6 +157,7 @@ def print_like_dislike(x: gr.LikeData):
 
 def add_text(history, text):
     history = history + [(text, None)]
+
     return history, gr.Textbox(value="", interactive=False)
 
 
