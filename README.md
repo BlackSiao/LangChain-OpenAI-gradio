@@ -17,11 +17,11 @@
 
 
 # 成品演示：
-![Image text](https://github.com/BlackSiao/LangChain-OpenAI-gradio/tree/main/img/demo.png))
+![Image text](https://github.com/BlackSiao/LangChain-OpenAI-gradio/blob/main/img/demo.png)
 
 使用LangChain-smith进行调试，可以清晰的看到本地检索了哪些段落，整个chain的工作流程
 
-![image](https://github.com/BlackSiao/LangChain-OpenAI-gradio/tree/main/img/smith.png))
+![image](https://github.com/BlackSiao/LangChain-OpenAI-gradio/tree/main/img/smith.png)
 
 
 
