@@ -2,7 +2,8 @@
 本地知识库问答，使用LangChain作为框架，PyCharm作为运行环境，通过简单的配置gradio完成web交互端
 
 ！！！
-在运行本项目之前，请首先申请OpenAI的API_Key, 并确认能够正常的翻墙，否则无法正常运行。
+1.在运行本项目之前，请首先申请OpenAI的API_Key, 并确认能够正常的翻墙，否则无法正常运行。
+2.如果想要使用LangSmith进行项目的评估，也需要注册LangChain的API_KEY,并将其添加到环境变量中，具体参考:https://docs.smith.langchain.com/tracing/quick_start
 
 # 项目目前成果
 要想看成品，可以直接运行final_test.py文件，在命令栏点击链接即可跳转到Web交互端，本项目目前训练集
