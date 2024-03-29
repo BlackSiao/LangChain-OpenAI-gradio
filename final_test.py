@@ -1,4 +1,3 @@
-# 完成基本的UI界面，调试使得LLM回答的准确度提高
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
@@ -12,11 +11,7 @@ from langchain_community.vectorstores import Chroma
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain_core.messages import AIMessage, HumanMessage
 
-# 调用LangChain-smith
-os.environ['LANGCHAIN_API_KEY'] = 'ls__57a5dab74800476883643b1813746542'
-os.environ['LANGCHAIN_PROJECT'] = 'RAG-Application'
-os.environ['LANGCHAIN_TRACING_V2'] = 'true'
-os.environ['LANGCHAIN_ENDPOINT'] = 'https://api.smith.langchain.com'
+# 设置全局变量
 chat_history = []
 
 # 文件加载，直接加载本地book文件夹下的所有文件，并使用拆分器将其拆分
@@ -113,6 +108,7 @@ def predict(message, history):
     # 设置主链的内容
     qa_system_prompt = """你是一个专门回答问题的助手。 \
         擅长使用以下的Context作为依据回答问题。 \
+        如果用户的问题和Context无关，则忽略Context并尝试回答问题。 \
         如果你不知道答案，回答不知道即可，不要尝试捏造答案。 \
         尽可能详细，全面的回答问题。\
         {context}"""
