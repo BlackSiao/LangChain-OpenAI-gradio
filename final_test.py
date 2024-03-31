@@ -71,7 +71,7 @@ def store_chroma(docs, embeddings, persist_directory="VectorStore"):
 # 初始化设置，优化代码运行速度
 chat_history = []
 # 加载并初始化模型
-model = ChatOpenAI(temperature=1.0, model="gpt-3.5-turbo")
+model = ChatOpenAI(model="gpt-3.5-turbo", temperature=1.0)
 # 将llm的输出转换为str
 output_parser = StrOutputParser()
 # 加载embedding模型
@@ -169,16 +169,20 @@ def add_file(history, file):
 
 # 定义滑块监听事件，当用户松开滑块时，更改对llm模型的设置
 def change_temperature(temperature_value):
-    # 加载并初始化模型
-    model = ChatOpenAI(temperature=temperature_value, model="gpt-3.5-turbo")
+    # 使用此时的温度值重新初始化模型
+    model = ChatOpenAI(model="gpt-3.5-turbo", temperature=temperature_value)
     print(temperature_value)
 
 
 def change_maxtoken(token_value):
-    # 加载并初始化模型
-    model = ChatOpenAI(max_tokens=token_value, model="gpt-3.5-turbo")
+    # 使用max_token值重新初始化模型
+    model = ChatOpenAI(model="gpt-3.5-turbo", max_tokens=token_value)
     print(token_value)
 
+
+def change_ret(ret_value):
+    model = ChatOpenAI(model="gpt-3.5-turbo", max_retries=ret_value)
+    print(ret_value)
 
 def bot(history):
     '''
@@ -231,10 +235,10 @@ with gr.Blocks(theme='NoCrypt/miku') as demo:
     with gr.Accordion("修改模型参数"):
         temp_slider = gr.Slider(minimum=0, maximum=2, value=0.7, step=0.1, label="温度调节", interactive=True,
                                 info="控制llm回答的随机性")
-        max_slider = gr.Slider(minimum=100, maximum=1000, value=500, step=50, label="最大回答数调节", interactive=True,
-                               info="控制llm回答的字数")
-        ret_slider = gr.Slider(minimum=0, maximum=2, value=1, label="本地检索", interactive=True,
-                               info="Maximum number of retries to make when generating.")
+        max_slider = gr.Slider(minimum=100, maximum=1000, value=500, step=50, label="最大回答字数", interactive=True,
+                               info="控制答案的最大字数")
+        ret_slider = gr.Slider(minimum=0, maximum=2, value=1, step=1, label="本地检索", interactive=True,
+                               info="在响应失败后，最大的重试次数")
         Picker = gr.ColorPicker(label="选择你喜欢的颜色")
     # 设置提交用户问题按钮的监听事件
     # 首先调用add_text()函数处理用户输入，随后传入llm模型返回回答
@@ -245,10 +249,16 @@ with gr.Blocks(theme='NoCrypt/miku') as demo:
     file_msg = btn.upload(add_file, [chatbot, btn], [chatbot], queue=False).then(
         bot, chatbot, chatbot
     )
+
     # 将提交按钮的监听事件与按钮的点击事件绑定
     submit_msg = submit_btn.click(add_text, [chatbot, txt], [chatbot, txt], queue=False).then(
         bot, chatbot, chatbot, api_name="bot_response")
     submit_msg.then(lambda: gr.Textbox(interactive=True), None, [txt], queue=False)
+
+    # release 监听器，当用户松开调节滑块的鼠标时触发，将此时的滑块值传递传给对应的fn
+    tem_release = temp_slider.release(change_temperature, inputs=temp_slider)
+    max_release = max_slider.release(change_maxtoken, inputs=max_slider)
+    ret_release = ret_slider.release(change_ret, inputs=ret_slider)
 
     chatbot.like(print_like_dislike, None, None)
 
