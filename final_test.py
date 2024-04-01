@@ -240,6 +240,14 @@ with gr.Blocks(theme='NoCrypt/miku') as demo:
         ret_slider = gr.Slider(minimum=0, maximum=2, value=1, step=1, label="本地检索", interactive=True,
                                info="在响应失败后，最大的重试次数")
         Picker = gr.ColorPicker(label="选择你喜欢的颜色")
+        # 为chatbot添加示例
+        gr.Examples(
+            examples=[
+                ["你好"],
+                ["简单介绍一下骆驼祥子"],
+                ["儒林外史讲的是什么？"],
+            ],
+            inputs=txt)
     # 设置提交用户问题按钮的监听事件
     # 首先调用add_text()函数处理用户输入，随后传入llm模型返回回答
     txt_msg = txt.submit(add_text, [chatbot, txt], [chatbot, txt], queue=False).then(
