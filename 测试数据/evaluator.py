@@ -1,4 +1,5 @@
 # 尝试使用embedding模型将文本转换为向量，并计算二者的距离和相似度。
+# 自己手写的评估器，通过计算二文本的余弦相似度
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 import numpy as np
 
