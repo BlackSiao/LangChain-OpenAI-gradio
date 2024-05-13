@@ -42,6 +42,7 @@ def load_documents(directory='book'):
     "text2vec3": "shibing624/text2vec-base-chinese",}
 """
 
+
 def load_embedding_model(model_name="ernie-tiny"):
     """
     加载embedding模型
@@ -89,7 +90,7 @@ def predict(message, history):
     # 加载embedding模型
     embedding = load_embedding_model('text2vec3')
     # 加载数据库，不存在向量库就生成，否则直接加载
-    if not os.path.exists('VectorStore'):
+    if not os.path.exists('../VectorStore'):
         documents = load_documents()
         db = store_chroma(documents, embedding)
     else:

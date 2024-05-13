@@ -93,7 +93,7 @@ def predict(message, history):
     # 加载embedding模型
     embedding = load_embedding_model('text2vec3')
     # 加载数据库，不存在向量库就生成，否则直接加载
-    if not os.path.exists('VectorStore'):
+    if not os.path.exists('../VectorStore'):
         documents = load_documents(directory='book')
         db = store_chroma(documents, embedding)
     else:

@@ -87,7 +87,7 @@ def predict(message, history):
     # 加载embedding模型
     embedding = load_embedding_model('text2vec3')
     # 加载数据库，不存在向量库就生成，否则直接加载
-    if not os.path.exists('VectorStore'):
+    if not os.path.exists('../VectorStore'):
         documents = load_documents(directory='book')
         db = store_chroma(documents, embedding)
     else:
@@ -124,6 +124,10 @@ def add_file(history, file):
     history = history + [((file.name,), None)]
     return history
 
+def Clear_history():
+
+    return
+
 
 def bot(history):
     '''
@@ -147,7 +151,8 @@ def bot(history):
         yield history
 
 
-with gr.Blocks() as demo:
+with gr.Blocks(theme='NoCrypt/miku') as demo:
+    gr.Markdown("欢迎使用本地知识库问答系统，请输入您的问题")
     # 定义聊天框
     chatbot = gr.Chatbot(
         [],
@@ -157,6 +162,7 @@ with gr.Blocks() as demo:
         # layout如果为"panel"显示聊天框为llm风格，"bubbles"显示为聊天气泡
         layout="bubble"
     )
+    Picker = gr.ColorPicker(label="选择你喜欢的颜色")
     # 定义行的布局g
     with gr.Row():
         txt = gr.Textbox(
@@ -165,8 +171,16 @@ with gr.Blocks() as demo:
             placeholder="输入您的问题，或者上传一个文件",
             container=False,
         )
+        # 提交按钮
+        submit_btn = gr.Button("Submit")
+        # 清零按钮
+        clear_btn = gr.Button("Clear History")
         # 限定上传文件的类型只为text文件
         btn = gr.UploadButton("📁", file_types=["text"])
+    with gr.Accordion("修改模型参数"):
+        temp_slider = gr.Slider(minimum=0, maximum=2, value=0.7, step=0.1, label="温度调节", interactive=True, info="控制llm回答的随机性")
+        max_slider = gr.Slider(minimum=100, maximum=1000, value=500, step=50, label="最大回答数调节", interactive=True, info="控制llm回答的字数")
+        ret_slider = gr.Slider(minimum=0,maximum=2,value=1, label="本地检索", interactive=True, info="Maximum number of retries to make when generating.")
     # 设置提交用户问题按钮的监听事件
     # 首先调用add_text()函数处理用户输入，随后传入llm模型返回回答
     txt_msg = txt.submit(add_text, [chatbot, txt], [chatbot, txt], queue=False).then(
@@ -176,6 +190,11 @@ with gr.Blocks() as demo:
     file_msg = btn.upload(add_file, [chatbot, btn], [chatbot], queue=False).then(
         bot, chatbot, chatbot
     )
+    # 提交按钮的监听事件
+    submit_btn.click(predict, inputs=txt, outputs=chatbot)
+
+    # 清零按钮的监听事件
+    clear_btn.click(lambda: chatbot.update(None), None, queue=False)
 
     chatbot.like(print_like_dislike, None, None)
 
