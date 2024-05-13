@@ -1,3 +1,4 @@
+# 使用RAGAs正经进行测试的
 from langchain_wenxin import Wenxin
 from langsmith import Client
 from langchain_core.output_parsers import StrOutputParser
