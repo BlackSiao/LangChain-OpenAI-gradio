@@ -21,8 +21,8 @@
 **最终成品
 LLM-based-Knowledge-Base-QA.py---经过一系列测试完成的最终版，提供各种参数供用户设置，可回答本地文件夹book内的问题
 
-# 成品演示：
-![Image text](https://github.com/BlackSiao/LangChain-OpenAI-gradio/blob/main/img/demo.png)
+# 最终成品演示：
+![Image text](https://github.com/BlackSiao/LangChain-OpenAI-gradio/blob/main/img/最终demo.png)
 
 使用LangChain-smith进行调试，可以清晰的看到本地检索了哪些段落，整个chain的工作流程
 
