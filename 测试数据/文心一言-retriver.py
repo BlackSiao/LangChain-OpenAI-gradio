@@ -14,8 +14,8 @@ from langsmith.evaluation import evaluate
 import numpy as np
 
 # 文心一言配置
-WENXIN_APP_Key = "sKzLrpmNHh4iHVGqwmntUurg"
-WENXIN_APP_SECRET = "DtHAE7441OlC1g0MsWoC3eMt6UVSr1zf"
+WENXIN_APP_Key = "***"
+WENXIN_APP_SECRET = "***"
 client = Client()
 
 
