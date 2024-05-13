@@ -1,10 +1,8 @@
-import openai
-from langsmith.wrappers import wrap_openai
+from langchain_wenxin import Wenxin
 from langsmith import Client
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
-from langchain_openai import ChatOpenAI
 import os
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import CharacterTextSplitter
@@ -14,11 +12,16 @@ from typing import List
 from langsmith.schemas import Example, Run
 from langsmith.evaluation import evaluate
 import numpy as np
+from langchain_community.llms import Tongyi
+import dashscope
 
+
+
+# 文心一言配置
+DASHSCOPE_API_KEY= "sk-8b5a0d0d6c8a41b6ab41a5553808be85"
 client = Client()
 
-# 修改Target
-openai_client = wrap_openai(openai.Client())
+
 # 文件加载，直接加载本地book文件夹下的所有文件，并使用拆分器将其拆分
 def load_documents(directory):
     # silent_errors可以跳过不能解码的内容
@@ -62,25 +65,6 @@ def store_chroma(docs, embeddings, persist_directory="VectorStore"):
     return db
 
 
-# 加载并初始化模型
-model = ChatOpenAI(model="gpt-3.5-turbo", temperature=1.0)
-# 将llm的输出转换为str
-output_parser = StrOutputParser()
-# 加载embedding模型
-embedding = load_embedding_model('text2vec3')
-# 加载数据库，不存在向量库就生成，否则直接加载
-if not os.path.exists('../VectorStore'):
-    documents = load_documents(directory='book')
-    db = store_chroma(documents, embedding)
-else:
-    db = Chroma(persist_directory='VectorStore', embedding_function=embedding)
-# 从数据库中获取一个检索器，用于从向量库中检索和给定文本相匹配的内容
-# search_kwargs设置检索器会返回多少个匹配的向量
-    retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 4})
-setup_and_retrieval = RunnableParallel(
-    {"context": retriever, "question": RunnablePassthrough()}
-)
-
 # 设置主链的内容
 qa_system_prompt = """你是一个专门回答问题的助手。 \
     擅长使用以下的Context作为依据回答问题。 \
@@ -94,6 +78,31 @@ qa_prompt = ChatPromptTemplate.from_messages(
         ("human", "{question}"),
     ]
 )
+# 加载模型
+model = Tongyi(
+    temperature=0.9,
+    model="llama3-8b-instruct",
+    dashscope_api_key=DASHSCOPE_API_KEY,
+    verbose=True,
+)
+
+# 将llm的输出转换为str
+output_parser = StrOutputParser()
+# 加载embedding模型
+embedding = load_embedding_model('text2vec3')
+# 加载数据库，不存在向量库就生成，否则直接加载
+if not os.path.exists('../VectorStore'):
+    documents = load_documents(directory='book')
+    db = store_chroma(documents, embedding)
+else:
+    db = Chroma(persist_directory='VectorStore', embedding_function=embedding)
+# 从数据库中获取一个检索器，用于从向量库中检索和给定文本相匹配的内容
+# search_kwargs设置检索器会返回多少个匹配的向量
+retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 4})
+setup_and_retrieval = RunnableParallel(
+    {"context": retriever, "question": RunnablePassthrough()}
+)
+
 rag_chain = (
         setup_and_retrieval
         | qa_prompt
@@ -102,7 +111,7 @@ rag_chain = (
 
 
 def evaluate_predict(inputs: dict):
-    return {"prediction": rag_chain.invoke(inputs['question']).content}
+    return {"prediction": rag_chain.invoke(inputs['question'])}
 
 
 # 计算余弦相似度
@@ -111,10 +120,6 @@ def cosine_similarity(vec1, vec2):
     norm_vec1 = np.linalg.norm(vec1)
     norm_vec2 = np.linalg.norm(vec2)
     return dot_product / (norm_vec1 * norm_vec2)
-
-
-# 加载embedding模型
-embedding = load_embedding_model('text2vec3')
 
 
 def f1_score_summary_evaluator(runs: List[Run], examples: List[Example]) -> dict:
@@ -149,10 +154,10 @@ def f1_score_summary_evaluator(runs: List[Run], examples: List[Example]) -> dict
 
 experiment_results = evaluate(
     evaluate_predict,    # RAG系统，也是我的Target
-    data="RAG系统测试数据集2",   # 数据集
+    data="RAG系统测试数据集8",   # 数据集
     summary_evaluators=[f1_score_summary_evaluator],  # The evaluators to score the results
-    experiment_prefix="OpenAI-retriver-mmr",   # A prefix for your experiment names to easily identify them
+    experiment_prefix="LLam-retriver",   # A prefix for your experiment names to easily identify them
     metadata={
-      "version": "1.0.1",
+      "version": "2.0.1",
     },
-) 
+)

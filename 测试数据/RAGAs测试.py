@@ -1,24 +1,30 @@
-import openai
-from langsmith.wrappers import wrap_openai
+from langchain_wenxin import Wenxin
 from langsmith import Client
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
-from langchain_openai import ChatOpenAI
 import os
 from langchain_community.document_loaders import DirectoryLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-from typing import List
-from langsmith.schemas import Example, Run
-from langsmith.evaluation import evaluate
-import numpy as np
+from ragas import evaluate
+from datasets import Dataset
+from ragas.metrics import (
+    faithfulness,
+    answer_relevancy,
+    context_recall,
+    context_precision,
+)
 
+
+
+# 文心一言配置
+WENXIN_APP_Key = "sKzLrpmNHh4iHVGqwmntUurg"
+WENXIN_APP_SECRET = "DtHAE7441OlC1g0MsWoC3eMt6UVSr1zf"
 client = Client()
 
-# 修改Target
-openai_client = wrap_openai(openai.Client())
+
 # 文件加载，直接加载本地book文件夹下的所有文件，并使用拆分器将其拆分
 def load_documents(directory):
     # silent_errors可以跳过不能解码的内容
@@ -62,8 +68,26 @@ def store_chroma(docs, embeddings, persist_directory="VectorStore"):
     return db
 
 
-# 加载并初始化模型
-model = ChatOpenAI(model="gpt-3.5-turbo", temperature=1.0)
+# 设置主链的内容
+# 定义提示模板
+template = """您是一个问答任务的助手。
+使用以下检索到的上下文片段回答问题。
+如果您不知道答案，只需说您不知道。
+最多使用两个句子，保持答案简洁。
+问题：{question}
+上下文：{context}
+答案：
+"""
+qa_prompt = ChatPromptTemplate.from_template(template)
+# 加载模型
+model = Wenxin(
+    temperature=0.9,
+    model="ernie-bot-turbo",
+    baidu_api_key=WENXIN_APP_Key,
+    baidu_secret_key=WENXIN_APP_SECRET,
+    verbose=True,
+)
+
 # 将llm的输出转换为str
 output_parser = StrOutputParser()
 # 加载embedding模型
@@ -76,83 +100,61 @@ else:
     db = Chroma(persist_directory='VectorStore', embedding_function=embedding)
 # 从数据库中获取一个检索器，用于从向量库中检索和给定文本相匹配的内容
 # search_kwargs设置检索器会返回多少个匹配的向量
-    retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 4})
+retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 4})
 setup_and_retrieval = RunnableParallel(
     {"context": retriever, "question": RunnablePassthrough()}
 )
 
-# 设置主链的内容
-qa_system_prompt = """你是一个专门回答问题的助手。 \
-    擅长使用以下的Context作为依据回答问题。 \
-    如果用户的问题和Context无关，则忽略Context并尝试回答问题。 \
-    如果你不知道答案，回答不知道即可，不要尝试捏造答案。 \
-    尽可能简洁明了的回答问题。\
-    {context}"""
-qa_prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", qa_system_prompt),
-        ("human", "{question}"),
-    ]
-)
 rag_chain = (
         setup_and_retrieval
         | qa_prompt
         | model
 )
 
-
-def evaluate_predict(inputs: dict):
-    return {"prediction": rag_chain.invoke(inputs['question']).content}
-
-
-# 计算余弦相似度
-def cosine_similarity(vec1, vec2):
-    dot_product = np.dot(vec1, vec2)
-    norm_vec1 = np.linalg.norm(vec1)
-    norm_vec2 = np.linalg.norm(vec2)
-    return dot_product / (norm_vec1 * norm_vec2)
-
-
-# 加载embedding模型
-embedding = load_embedding_model('text2vec3')
+questions = ["Who is the wife of Camel Xiangzi?",
+             "Who is the author of Journey to the West?",
+             "What is the courtesy name of Dong Zhuo?",
+             "What is the job of Camel Xiangzi?",
+             "In the novel 'The Back', what is the first book that 'I' read?"
+]
+ground_truths = [["The wife of Camel Xiangzi is Huzi"],
+                 ["The author of Journey to the West is Wu Cheng'en"],
+                 ["The courtesy name of Dong Zhuo is Zhongying"],
+                 ["The job of Camel Xiangzi is a rickshaw puller"],
+                 ["In the novel 'The Back', the first book that 'I' read is 'The Story of a Stray' by Sanmao"]]
 
 
-def f1_score_summary_evaluator(runs: List[Run], examples: List[Example]) -> dict:
-    correct_predictions = 0
-    incorrect_predictions = 0
+answers = []
+contexts = []
 
-    for run, example in zip(runs, examples):
-        reference = example.outputs["answer"]
-        prediction = run.outputs["prediction"]
+for query in questions:
+  answers.append(rag_chain.invoke(query))
+  contexts.append([docs.page_content for docs in retriever.get_relevant_documents(query)])
 
-        # 提取参考答案和预测结果中的字符串
-        reference_str = " ".join(reference)
-        prediction_str = " ".join(prediction)
+# To dict
+data = {
+    "question": questions,
+    "answer": answers,
+    "contexts": contexts,
+    "ground_truths": ground_truths
+}
 
-        # 计算参考答案和预测结果的语义表示
-        [vec1, vec2] = embedding.embed_documents([reference_str, prediction_str])
-        # 使用余弦相似度函数计算相似度
-        similarity = cosine_similarity(vec1, vec2)
-        print(reference_str, "相似度", similarity)
-        threshold = 0.65  # 可以根据实际情况调整阈值
-        # 如果相似度>=阈值，则将其视为预测成功
-        if similarity >= threshold:
-            correct_predictions += 1
-        # 如果相似度<阈值，则视为预测失败
-        else:
-            incorrect_predictions += 1
+# Convert dict to dataset
+dataset = Dataset.from_dict(data)
 
-    accuracy = correct_predictions / (correct_predictions + incorrect_predictions)
+result = evaluate(
+    dataset=dataset,
+    metrics=[
+        context_precision,
+        context_recall,
+        faithfulness,
+        answer_relevancy,
+    ],
+    llm=model,
+    embeddings=embedding
+)
 
-    return {"key": "Accuracy", "score": accuracy}
+# 然后使用 df 来显示数据，会根据设置的选项显示
+df = result.to_pandas()
+df.to_excel('~/Desktop/result.xlsx', index=False)  # 将 DataFrame 保存为名为 result.xlsx 的 Excel 文件到桌面，不包含索引
 
-
-experiment_results = evaluate(
-    evaluate_predict,    # RAG系统，也是我的Target
-    data="RAG系统测试数据集2",   # 数据集
-    summary_evaluators=[f1_score_summary_evaluator],  # The evaluators to score the results
-    experiment_prefix="OpenAI-retriver-mmr",   # A prefix for your experiment names to easily identify them
-    metadata={
-      "version": "1.0.1",
-    },
-) 
