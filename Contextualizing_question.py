@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 import os
 
 # 调用LangChain-smith
-os.environ['LANGCHAIN_API_KEY'] = 'ls__57a5dab74800476883643b1813746542'
+os.environ['LANGCHAIN_API_KEY'] = '你的LangChain-API-KEY'
 os.environ['LANGCHAIN_PROJECT'] = 'RAG-Application'
 os.environ['LANGCHAIN_TRACING_V2'] = 'true'
 os.environ['LANGCHAIN_ENDPOINT'] = 'https://api.smith.langchain.com'
