@@ -18,7 +18,7 @@ import dashscope
 
 
 # 文心一言配置
-DASHSCOPE_API_KEY= "sk-8b5a0d0d6c8a41b6ab41a5553808be85"
+DASHSCOPE_API_KEY= "你的文心一言API-KEY"
 client = Client()
 
 
