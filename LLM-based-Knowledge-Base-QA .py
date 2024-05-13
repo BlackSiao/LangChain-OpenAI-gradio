@@ -10,7 +10,14 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from langchain_core.messages import AIMessage, HumanMessage
+from langchain_community.llms import Tongyi
 
+# 文心一言配置
+WENXIN_APP_Key = "sKzLrpmNHh4iHVGqwmntUurg"
+WENXIN_APP_SECRET = "DtHAE7441OlC1g0MsWoC3eMt6UVSr1zf"
+
+# 通译千问的配置
+DASHSCOPE_API_KEY= "sk-8b5a0d0d6c8a41b6ab41a5553808be85"
 
 # 文件加载，直接加载本地book文件夹下的所有文件，并使用拆分器将其拆分
 def load_documents(directory):
@@ -70,6 +77,11 @@ def store_chroma(docs, embeddings, persist_directory="VectorStore"):
     db.persist()
     return db
 
+# 设置为全局变量
+model_name = 1
+temperature_value=0.7
+token_value=5000
+ret_value=2
 
 # 初始化设置，优化代码运行速度
 chat_history = []
@@ -158,7 +170,6 @@ def add_text(history, text):
 
     return history, gr.Textbox(value="", interactive=False)
 
-
 def add_file(history, file):
     directory = os.path.dirname(file.name)  # 拿到临时文件夹
     documents = load_documents(directory)
@@ -169,22 +180,43 @@ def add_file(history, file):
     return history
 
 
-# 定义滑块监听事件，当用户松开滑块时，更改对llm模型的设置
-def change_temperature(temperature_value):
-    # 使用此时的温度值重新初始化模型
-    model = ChatOpenAI(model="gpt-3.5-turbo", temperature=temperature_value)
-    print(temperature_value)
+# 定义模型的切换及其内部参数设计
+def model_change_handler(model_name, temperature_value, token_value, ret_value):
+    global model
+    if model_name == 1:
+        model = ChatOpenAI(model="gpt-3.5-turbo",
+                           temperature=temperature_value,
+                           max_tokens=token_value,
+                           max_retries=ret_value)
+    # elif model_name == 2:
+    #     model = Wenxin(
+    #         model="ernie-bot-turbo",
+    #         baidu_api_key=WENXIN_APP_Key,
+    #         baidu_secret_key=WENXIN_APP_SECRET,
+    #         temperature=temperature_value,
+    #         max_tokens=token_value,
+    #         max_retries=ret_value,
+    #         verbose=True,
+    #     )
+    elif model_name == 3:
+        model = Tongyi(
+            model="qwen-turbo",
+            dashscope_api_key=DASHSCOPE_API_KEY,
+            temperature=temperature_value,
+            max_tokens=token_value,
+            max_retries=ret_value,
+            verbose=True,
+        )
+    elif model_name == 4:
+        model = Tongyi(
+            model="llama3-8b-instruct",
+            dashscope_api_key=DASHSCOPE_API_KEY,
+            verbose=True,
+            temperature=temperature_value,
+            max_tokens=token_value,
+            max_retries=ret_value
+        )
 
-
-def change_maxtoken(token_value):
-    # 使用max_token值重新初始化模型
-    model = ChatOpenAI(model="gpt-3.5-turbo", max_tokens=token_value)
-    print(token_value)
-
-
-def change_ret(ret_value):
-    model = ChatOpenAI(model="gpt-3.5-turbo", max_retries=ret_value)
-    print(ret_value)
 
 def bot(history):
     '''
@@ -194,10 +226,9 @@ def bot(history):
     '''
     message = history[-1][0]
     # 用来在终端监视程序有无正确提取到用户提出的问题
-    print(message)
     # 检查文件是否上传成功，如果上传的是文件，则用户信息就是元组
     if isinstance(message, tuple):
-        response = "文件上传成功！！"
+        response = "文件上传成功！"
     else:
         response = predict(message, history)
     # 将最新对话记录中的机器人回复部分置空
@@ -244,6 +275,13 @@ with gr.Blocks(theme='NoCrypt/miku') as demo:
                 ["奶油草莓蛋糕怎么制作？"]
             ],
             inputs=txt)
+        # 设置下拉菜单，更改使用的大语言模型基底
+        model_change = gr.Dropdown(
+            choices=[("GPT-3.5", 1), ("文心一言", 2), ("通译千问", 3), ("LLam", 4)],
+            value=1,
+            label="大语言模型",
+            info="选择您想使用的大语言模型基座!"
+        )
         temp_slider = gr.Slider(minimum=0, maximum=2, value=0.7, step=0.1, label="温度调节", interactive=True,
                                 info="控制大语言模型回答的随机性")
         max_slider = gr.Slider(minimum=100, maximum=1000, value=500, step=50, label="最大回答字数", interactive=True,
@@ -266,12 +304,19 @@ with gr.Blocks(theme='NoCrypt/miku') as demo:
     submit_msg.then(lambda: gr.Textbox(interactive=True), None, [txt], queue=False)
 
     # release 监听器，当用户松开调节滑块的鼠标时触发，将此时的滑块值传递传给对应的fn
-    tem_release = temp_slider.release(change_temperature, inputs=temp_slider)
-    max_release = max_slider.release(change_maxtoken, inputs=max_slider)
-    ret_release = ret_slider.release(change_ret, inputs=ret_slider)
+    tem_release = temp_slider.release(model_change_handler,
+                                      inputs=[model_change, temp_slider, max_slider, ret_slider])
+    max_release = max_slider.release(model_change_handler,
+                                     inputs=[model_change, temp_slider, max_slider, ret_slider])
+    ret_release = ret_slider.release(model_change_handler,
+                                     inputs=[model_change, temp_slider, max_slider, ret_slider])
+
+    # 下拉条的监听事件,在切换大语言模型之后对话框有对应显示
+    model_change.select(model_change_handler,
+                        inputs=[model_change, temp_slider, max_slider, ret_slider])
 
     chatbot.like(print_like_dislike, None, None)
 
 demo.queue()
 if __name__ == "__main__":
-    demo.launch(share=False)
+    demo.launch(share=True)
