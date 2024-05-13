@@ -1,5 +1,4 @@
-# 引入gradio为本地知识库做出一个精美的可交互web端
-
+# 配置好OpenAI-key后用于测试是否能正常连接
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
