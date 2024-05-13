@@ -10,8 +10,8 @@ from langsmith.evaluation import evaluate
 import numpy as np
 
 # 文心一言配置
-WENXIN_APP_Key = "sKzLrpmNHh4iHVGqwmntUurg"
-WENXIN_APP_SECRET = "DtHAE7441OlC1g0MsWoC3eMt6UVSr1zf"
+WENXIN_APP_Key = "你的文心一言API-KEY"
+WENXIN_APP_SECRET = "你的文心一言密钥"
 client = Client()
 
 
