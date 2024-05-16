@@ -13,11 +13,11 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_community.llms import Tongyi
 
 # 文心一言配置
-WENXIN_APP_Key = "sKzLrpmNHh4iHVGqwmntUurg"
-WENXIN_APP_SECRET = "DtHAE7441OlC1g0MsWoC3eMt6UVSr1zf"
+WENXIN_APP_Key = ""
+WENXIN_APP_SECRET = ""
 
 # 通译千问的配置
-DASHSCOPE_API_KEY= "sk-8b5a0d0d6c8a41b6ab41a5553808be85"
+DASHSCOPE_API_KEY= ""
 
 # 文件加载，直接加载本地book文件夹下的所有文件，并使用拆分器将其拆分
 def load_documents(directory):
